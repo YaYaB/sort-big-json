@@ -21,7 +21,7 @@ pip install git+https://github.com/YaYaB/sort-big-json
 ```sh
 usage: Sort a huge json file without loading in fully in RAM
        [-h] [--input_file INPUT_FILE] [--batch_size BATCH_SIZE] [--key KEY]
-       [--output_file OUTPUT_FILE]
+       [--sep SEP] [--is_json] [--output_file OUTPUT_FILE]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -29,7 +29,9 @@ optional arguments:
                         Path to input file
   --batch_size BATCH_SIZE
                         Batch size that can fit in memory
-  --key KEY             Key or subkey used to sor
+  --key KEY             Key or subkey used to sort
+  --sep SEP             separator for nested key
+  --is_json             Indicate if it is a json or ljson file
   --output_file OUTPUT_FILE
                         Path to output sorted file
 
