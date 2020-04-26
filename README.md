@@ -37,7 +37,7 @@ optional arguments:
 
 ```
 
-Please refer to [here](https://github.com/YaYaB/sort-big-json/examples) for examples.
+Please refer to [here](examples) for examples.
 
 ## Benchmark
 The machine used has the following specs:
