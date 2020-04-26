@@ -21,13 +21,14 @@ def get_args():
     return args
 
 
-def compute_nb_read(path_file, batch_size, key, sep):
+def compute_nb_read(path_file, batch_size, key, sep, is_json=False):
     """
         :param path_file: path file for which we count the number of lines
         :param batch_size: batch size that the machine can handle
         :param key: key or subkey on which to sort
         :param sep: separator for nested key
-        :return: number of read necessary and the data to sort
+        :param is_json: True if json and False if ljson
+        :return: number of read necessary, number of lines the data to sort
     """
     nested_key = key.split(sep)
     print(nested_key)
@@ -46,12 +47,12 @@ def compute_nb_read(path_file, batch_size, key, sep):
     nb_lines = i +1
     nb_read = math.ceil(nb_lines / batch_size)
 
-    return nb_read, data_to_sort
+    return nb_read, nb_lines, data_to_sort
 
 
 def compute_sorted_index(data_to_sort):
     """
-        :param data_to_sort: data_to_sort 
+        :param data_to_sort: data_to_sort
         :return: sorted index of the number of lines
     """
     # Create index sorted
@@ -63,7 +64,7 @@ def compute_sorted_index(data_to_sort):
 def generate_random_string(length=500, alphabet="azertyuiopqsdfghjklmwxcvbn1234567890"):
     """
         :param length: length of string wanted
-        :param alphabet: alphabet from witch characters are sampled 
+        :param alphabet: alphabet from witch characters are sampled
         :return: random string of size `length`
     """
     return ''.join(random.choice(alphabet) for x in range(length))
@@ -98,13 +99,14 @@ def generate_random_json_file_cli():
     generate_random_json_file(opt.path_file, opt.suffix, opt.nb_lines, opt.max_line_length)
 
 
-def sort_json(input_file, output_file, idx_sorted, nb_read, batch_size):
+def sort_json(input_file, output_file, idx_sorted, nb_read, batch_size, is_json=False):
     """
         :param input_file: path file that will be created
         :param output_file: number of lines wanted
         :param idx_sorted: index sorted
         :param nb_read: number of read necessary
         :param batch_size: batch size used
+        :param is_json: True if json and False if ljson
 
     """
     with open(output_file, 'a') as f:
@@ -146,7 +148,40 @@ def sort_json(input_file, output_file, idx_sorted, nb_read, batch_size):
             print('[INFO]', nb_read - (i+1), 'read are left. It will take', str(timedelta(seconds=(nb_read - (i+1)) * (datetime.now() - startTime).total_seconds())))
 
 
-def main():
+def sort_big_json(input_file, batch_size, key, sep, output_file, is_json=False):
+    """
+        :param input_file: path file that will be created
+        :param batch_size: batch size used
+        :param key: key or subkey on which to sort
+        :param sep: separator for nested key
+        :param output_file: number of lines wanted
+        :param is_json: True if json and False if ljson
+
+    """
+
+    assert os.path.exists(input_file)
+    assert not os.path.exists(output_file)
+    assert key is not None
+
+    # Compute number of read necessary
+    startTime_ = datetime.now()
+    nb_read, nb_lines, data_to_sort = compute_nb_read(input_file, batch_size, key, sep)
+    one_read = datetime.now() - startTime_
+
+    print('[INFO] File was read in', str(one_read))
+    print('[INFO]', nb_read, 'read are necessary. It will take', str(timedelta(seconds=nb_read * one_read.total_seconds())))
+
+    # Get index sorted based on
+    idx_sorted = compute_sorted_index(data_to_sort)
+
+    # Sort file
+    sort_json(input_file, output_file, idx_sorted, nb_read, batch_size)
+    print('[INFO] File was sorted in', str(datetime.now() - startTime_))
+
+    return nb_lines
+
+
+def sort_big_json_cli():
     """
         Main function of the program
     """
@@ -165,25 +200,25 @@ def main():
 
     # Compute number of read necessary
     startTime_ = datetime.now()
-    nb_read, data_to_sort = compute_nb_read(input_file, batch_size, key, sep)
+    nb_read, nb_lines, data_to_sort = compute_nb_read(input_file, batch_size, key, sep)
     one_read = datetime.now() - startTime_
 
     print('[INFO] File was read in', str(one_read))
     print('[INFO]', nb_read, 'read are necessary. It will take', str(timedelta(seconds=nb_read * one_read.total_seconds())))
 
-    # Get index sorted based on 
+    # Get index sorted based on
     idx_sorted = compute_sorted_index(data_to_sort)
-    
+
     # Sort file
     sort_json(input_file, output_file, idx_sorted, nb_read, batch_size)
     print('[INFO] File was sorted in', str(datetime.now() - startTime_))
 
-    return 0
+    return nb_lines
 
 
 if __name__ == "__main__":
     try:
-        sys.exit(main())
+        sys.exit(sort_big_json_cli())
     except Exception as e:
         print("[ERR] Uncaught error waiting for scripts to finish")
         print(e)

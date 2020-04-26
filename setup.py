@@ -23,7 +23,7 @@ setup(name='sort-big-json',
       packages=find_packages(),
       entry_points={
           'console_scripts': [
-              'sort-big-json=sort_big_json.sort_big_json:main',
+              'sort-big-json=sort_big_json.sort_big_json:sort_big_json_cli',
               'generate-random-json-file=sort_big_json.sort_big_json:generate_random_json_file_cli'
           ]},
 
