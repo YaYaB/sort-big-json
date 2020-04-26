@@ -13,27 +13,34 @@ def get_args():
     )
     parser.add_argument("--input_file", type=str, help="Path to input file")
     parser.add_argument("--batch_size", type=int, help="Batch size that can fit in memory")
-    parser.add_argument("--key", type=str, help="Key or subkey used to sor")
+    parser.add_argument("--key", type=str, help="Key or subkey used to sort")
+    parser.add_argument("--sep", type=str, help="separator for nested key", default=".")
     parser.add_argument("--output_file", type=str, help="Path to output sorted file")
 
     args = parser.parse_args()
     return args
 
 
-def compute_nb_read(path_file, batch_size, key):
+def compute_nb_read(path_file, batch_size, key, sep):
     """
         :param path_file: path file for which we count the number of lines
         :param batch_size: batch size that the machine can handle
         :param key: key or subkey on which to sort
+        :param sep: separator for nested key
         :return: number of read necessary and the data to sort
     """
+    nested_key = key.split(sep)
+    print(nested_key)
     #TODO adapt to json
     data_to_sort = []
     # Read all file for the first time to know how many read we need
     with open(path_file) as f:
         for i, l in enumerate(f):
             # Get the data to sort
-            data_to_sort.append(json.loads(l)[key])
+            content = json.loads(l)
+            for k in nested_key:
+                content = content[k]
+            data_to_sort.append(content)
             pass
 
     nb_lines = i +1
@@ -42,10 +49,9 @@ def compute_nb_read(path_file, batch_size, key):
     return nb_read, data_to_sort
 
 
-def compute_sorted_index(data_to_sort, key):
+def compute_sorted_index(data_to_sort):
     """
         :param data_to_sort: data_to_sort 
-        :param key: key on which to sort
         :return: sorted index of the number of lines
     """
     # Create index sorted
@@ -75,9 +81,7 @@ def generate_random_json_file(path_file='./random_file', suffix=".json", nb_line
         if suffix == ".json":
             f.write("[\n")
         for i in range(0, nb_lines):
-            if i % 1000 == 0:
-                print(i)
-            f.write(json.dumps({'test': generate_random_string(max_line_length)}) + suff + "\n")
+            f.write(json.dumps({"test": {"case": generate_random_string(max_line_length)}}) + suff + "\n")
         if suffix == ".json":
             f.write("]")
 
@@ -153,6 +157,7 @@ def main():
     input_file = opt.input_file
     output_file = opt.output_file
     key = opt.key
+    sep = opt.sep
 
     assert os.path.exists(input_file)
     assert not os.path.exists(output_file)
@@ -160,14 +165,14 @@ def main():
 
     # Compute number of read necessary
     startTime_ = datetime.now()
-    nb_read, data_to_sort = compute_nb_read(input_file, batch_size, key)
+    nb_read, data_to_sort = compute_nb_read(input_file, batch_size, key, sep)
     one_read = datetime.now() - startTime_
 
     print('[INFO] File was read in', str(one_read))
     print('[INFO]', nb_read, 'read are necessary. It will take', str(timedelta(seconds=nb_read * one_read.total_seconds())))
 
     # Get index sorted based on 
-    idx_sorted = compute_sorted_index(data_to_sort, key)
+    idx_sorted = compute_sorted_index(data_to_sort)
     
     # Sort file
     sort_json(input_file, output_file, idx_sorted, nb_read, batch_size)
