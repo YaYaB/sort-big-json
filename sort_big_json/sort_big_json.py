@@ -15,10 +15,85 @@ def get_args():
     parser.add_argument("--batch_size", type=int, help="Batch size that can fit in memory")
     parser.add_argument("--key", type=str, help="Key or subkey used to sort")
     parser.add_argument("--sep", type=str, help="separator for nested key", default=".")
+    parser.add_argument('--is_json', action='store_true', default=False, help='Indicate if it is a json or ljson file')
     parser.add_argument("--output_file", type=str, help="Path to output sorted file")
 
     args = parser.parse_args()
     return args
+
+
+def read_jsons_chunks(file_object, chunk_size=10000):
+    """Lazy function to read a json by chunk.
+    Default chunk size: 10k"""
+    """
+        :param file_object: path file to read from
+        :param chunk_size: chunk_size to read (default to 10k)
+        :return: data read
+    """
+    # Parse the next real chunk_size lines
+    chunk = file_object.read(1000000)
+    data = []
+    i = 0
+    nb_bracket = 0
+    nb_quotes = 0
+    example = ""
+    count_escape_char = 0
+    while True:
+        # Read cahracter by character
+        for k, c in enumerate(chunk):
+            # Check quoting
+            if c == '"':
+                # Check only when '"' is a delimiter of field or value in json
+                if count_escape_char % 2 == 0:
+                    nb_quotes += 1
+            # Check beginning of brackets
+            elif c == '{' and nb_quotes % 2 == 0:
+                # Check only when '{' is a delimiter of field or value in json
+                if count_escape_char % 2 == 0:
+                    nb_bracket += 1
+            # Check ending of brackets
+            elif c == '}' and nb_quotes % 2 == 0:
+                # Check only when '"' is a delimiter of field or value in json
+                if count_escape_char % 2 == 0:
+                    nb_bracket -= 1
+                # This means we finished to read one json
+                if nb_bracket == 0 and nb_quotes % 2 == 0:
+                    example += c
+                    data.append(json.loads(example))
+                    i += 1
+                    # When chunk_size jsons obtained, dump those
+                    if i % chunk_size == 0:
+                        yield(data)
+                        data = []
+
+                    # Initialize those
+                    example = ""
+                    continue
+            # If we are in between 2 json examples or at the beginning
+            elif c in ['[', ',', '\n'] and nb_bracket == 0 and nb_quotes % 2 == 0:
+                continue
+            # If we are at the end of the file
+            if c in [']', ''] and nb_bracket == 0 and nb_quotes % 2 == 0:
+                # If EOF obtained or end of jsonarray send what's left of the data
+                if example == "" or example == "]":
+                    yield(data)
+                    return
+            if c == "\\":
+                count_escape_char += 1
+            else:
+                count_escape_char = 0
+            # Append character to the json example
+            example += c
+
+        # If at the end of the chunk, read new chunk
+        if k == len(chunk) - 1:
+            chunk = file_object.read(1000000)
+        # Keep what's left of the chunk
+        elif len(chunk) != 0:
+            chunk = chunk[k:]
+        # if k == 0 that means that we read the whole file
+        else:
+            break
 
 
 def compute_nb_read(path_file, batch_size, key, sep, is_json=False):
@@ -31,20 +106,25 @@ def compute_nb_read(path_file, batch_size, key, sep, is_json=False):
         :return: number of read necessary, number of lines the data to sort
     """
     nested_key = key.split(sep)
-    print(nested_key)
-    #TODO adapt to json
     data_to_sort = []
     # Read all file for the first time to know how many read we need
-    with open(path_file) as f:
-        for i, l in enumerate(f):
-            # Get the data to sort
-            content = json.loads(l)
-            for k in nested_key:
-                content = content[k]
-            data_to_sort.append(content)
-            pass
+    if is_json: # if json
+        f = open(path_file)
+        for jsons_chunks in read_jsons_chunks(f, chunk_size=batch_size):
+            for content in jsons_chunks:
+                for k in nested_key:
+                    content = content[k]
+                data_to_sort.append(content)
+    else: # if ljson
+        with open(path_file) as f:
+            for i, l in enumerate(f):
+                # Get the data to sort
+                content = json.loads(l)
+                for k in nested_key:
+                    content = content[k]
+                data_to_sort.append(content)
 
-    nb_lines = i +1
+    nb_lines = len(data_to_sort)
     nb_read = math.ceil(nb_lines / batch_size)
 
     return nb_read, nb_lines, data_to_sort
@@ -125,18 +205,34 @@ def sort_json(input_file, output_file, idx_sorted, nb_read, batch_size, is_json=
 
             j = 0
             #TODO adapt to json
-            with open(input_file) as in_f:
-                for k, l in enumerate(in_f):
-                    # If line in batch add it to list of elements
-                    if k == waiting_line:
-                        elements.append(l)
-                        j += 1
-                        # Try to access element to the idx sort
-                        try:
-                            waiting_line = idx_sort[j]
-                        # If fails that means it exceeds the max_line
-                        except:
-                            break
+            if is_json: # if json
+                in_f = open(input_file)
+                l = 0
+                for jsons_chunks in read_jsons_chunks(in_f, chunk_size=batch_size):
+                    for k, content in enumerate(jsons_chunks):
+                        if k + l == waiting_line:
+                            elements.append(json.dumps(content) + "\n")
+                            j += 1
+                            # Try to access element to the idx sort
+                            try:
+                                waiting_line = idx_sort[j]
+                            # If fails that means it exceeds the max_line
+                            except:
+                                break
+                    l += batch_size
+            else: # if ljson
+                with open(input_file) as in_f:
+                    for k, l in enumerate(in_f):
+                        # If line in batch add it to list of elements
+                        if k == waiting_line:
+                            elements.append(l)
+                            j += 1
+                            # Try to access element to the idx sort
+                            try:
+                                waiting_line = idx_sort[j]
+                            # If fails that means it exceeds the max_line
+                            except:
+                                break
 
             # Recreate original order
             elements = [elements[x] for x in rev_idx]
@@ -165,7 +261,7 @@ def sort_big_json(input_file, batch_size, key, sep, output_file, is_json=False):
 
     # Compute number of read necessary
     startTime_ = datetime.now()
-    nb_read, nb_lines, data_to_sort = compute_nb_read(input_file, batch_size, key, sep)
+    nb_read, nb_lines, data_to_sort = compute_nb_read(input_file, batch_size, key, sep, is_json)
     one_read = datetime.now() - startTime_
 
     print('[INFO] File was read in', str(one_read))
@@ -175,7 +271,7 @@ def sort_big_json(input_file, batch_size, key, sep, output_file, is_json=False):
     idx_sorted = compute_sorted_index(data_to_sort)
 
     # Sort file
-    sort_json(input_file, output_file, idx_sorted, nb_read, batch_size)
+    sort_json(input_file, output_file, idx_sorted, nb_read, batch_size, is_json)
     print('[INFO] File was sorted in', str(datetime.now() - startTime_))
 
     return nb_lines
@@ -193,6 +289,7 @@ def sort_big_json_cli():
     output_file = opt.output_file
     key = opt.key
     sep = opt.sep
+    is_json = opt.is_json
 
     assert os.path.exists(input_file)
     assert not os.path.exists(output_file)
@@ -200,7 +297,7 @@ def sort_big_json_cli():
 
     # Compute number of read necessary
     startTime_ = datetime.now()
-    nb_read, nb_lines, data_to_sort = compute_nb_read(input_file, batch_size, key, sep)
+    nb_read, nb_lines, data_to_sort = compute_nb_read(input_file, batch_size, key, sep, is_json)
     one_read = datetime.now() - startTime_
 
     print('[INFO] File was read in', str(one_read))
@@ -210,7 +307,7 @@ def sort_big_json_cli():
     idx_sorted = compute_sorted_index(data_to_sort)
 
     # Sort file
-    sort_json(input_file, output_file, idx_sorted, nb_read, batch_size)
+    sort_json(input_file, output_file, idx_sorted, nb_read, batch_size, is_json)
     print('[INFO] File was sorted in', str(datetime.now() - startTime_))
 
     return nb_lines
