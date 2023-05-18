@@ -3,7 +3,7 @@ from setuptools import find_packages
 
 
 setup(name='sort-big-json',
-      version='0.0.1',
+      version='0.0.2',
       description='Sort a big json file (based on a specifc key or subkey) that does not fit in memory',
       author='YaYaB',
       author_email='bezzayassine@gmail.com',
