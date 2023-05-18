@@ -5,7 +5,7 @@ BATCH_SIZE=1000
 
 # Generate random file
 echo "Generate random file ${INPUT_FILE} containing ${NB_LINES}"
-#generate-random-json-file --path_file "${INPUT_FILE}" --nb_lines "${NB_LINES}" --suffix ".json"
+generate-random-json-file --path_file "${INPUT_FILE}" --nb_lines "${NB_LINES}" --suffix ".json"
 
 # Sort the file created
 echo "Sort the file ${INPUT_FILE} to ${OUTPUT_FILE}"

@@ -13,6 +13,7 @@ def get_args():
     )
     parser.add_argument("--input_file", type=str, help="Path to input file")
     parser.add_argument("--batch_size", type=int, help="Batch size that can fit in memory")
+    parser.add_argument('--sort_order',choices=['ascending', 'descending'], help='Sort order (default ascending)', default="ascending")
     parser.add_argument("--key", type=str, help="Key or subkey used to sort")
     parser.add_argument("--sep", type=str, help="separator for nested key", default=".")
     parser.add_argument('--is_json', action='store_true', default=False, help='Indicate if it is a json or ljson file')
@@ -130,13 +131,14 @@ def compute_nb_read(path_file, batch_size, key, sep, is_json=False):
     return nb_read, nb_lines, data_to_sort
 
 
-def compute_sorted_index(data_to_sort):
+def compute_sorted_index(data_to_sort, reverse):
     """
         :param data_to_sort: data_to_sort
+        :param reverse: boolean (reverse sort if true else ascending sort)
         :return: sorted index of the number of lines
     """
     # Create index sorted
-    idx_sorted = sorted(range(len(data_to_sort)), key=lambda k: data_to_sort[k])
+    idx_sorted = sorted(range(len(data_to_sort)), key=lambda k: data_to_sort[k], reverse=reverse)
 
     return idx_sorted
 
@@ -244,7 +246,7 @@ def sort_json(input_file, output_file, idx_sorted, nb_read, batch_size, is_json=
             print('[INFO]', nb_read - (i+1), 'read are left. It will take', str(timedelta(seconds=(nb_read - (i+1)) * (datetime.now() - startTime).total_seconds())))
 
 
-def sort_big_json(input_file, batch_size, key, sep, output_file, is_json=False):
+def sort_big_json(input_file, batch_size, key, sep, output_file, is_json=False, reverse=False):
     """
         :param input_file: path file that will be created
         :param batch_size: batch size used
@@ -268,7 +270,7 @@ def sort_big_json(input_file, batch_size, key, sep, output_file, is_json=False):
     print('[INFO]', nb_read, 'read are necessary. It will take', str(timedelta(seconds=nb_read * one_read.total_seconds())))
 
     # Get index sorted based on
-    idx_sorted = compute_sorted_index(data_to_sort)
+    idx_sorted = compute_sorted_index(data_to_sort, reverse=reverse)
 
     # Sort file
     sort_json(input_file, output_file, idx_sorted, nb_read, batch_size, is_json)
@@ -290,6 +292,7 @@ def sort_big_json_cli():
     key = opt.key
     sep = opt.sep
     is_json = opt.is_json
+    reverse = True if opt.sort_order == "descending" else False
 
     assert os.path.exists(input_file)
     assert not os.path.exists(output_file)
@@ -304,7 +307,7 @@ def sort_big_json_cli():
     print('[INFO]', nb_read, 'read are necessary. It will take', str(timedelta(seconds=nb_read * one_read.total_seconds())))
 
     # Get index sorted based on
-    idx_sorted = compute_sorted_index(data_to_sort)
+    idx_sorted = compute_sorted_index(data_to_sort, reverse)
 
     # Sort file
     sort_json(input_file, output_file, idx_sorted, nb_read, batch_size, is_json)
